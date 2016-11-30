@@ -1,0 +1,6 @@
+public class HamSandwich extends Sandwich implements Mayonnaise {
+
+	public HamSandwich() {
+		System.out.println("Mayonnaise is terrible.");
+	}	
+}
