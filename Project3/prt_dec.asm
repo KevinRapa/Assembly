@@ -70,7 +70,7 @@ prt_dec:
 ;;;-------------------------------------------------------------
 ;;; Print the final value to standard output
 
-	MOV eax, SYSCALL_WRITE
+    MOV eax, SYSCALL_WRITE
     MOV ebx, STDOUT
     MOV ecx, strBuf		
     MOV edx, dword MAX_LEN	
@@ -80,7 +80,7 @@ prt_dec:
 ;;; Clear strBuf for subsequent calls. Clears from TOP
 
 	MOV ecx, edx                ; Starts from top (10)
-	XOR ah, ah 	                ; To clear bytes in strBuf
+	XOR ah, ah                  ; To clear bytes in strBuf
 .clearStrBufLoop:
 	MOV [strBuf + ecx - 1], ah  ; Clear a byte in strBuf
 	LOOP .clearStrBufLoop       ; Repeat if not done
@@ -89,5 +89,5 @@ prt_dec:
 ;;; Restore saved values
 
 	POPAD                   ; Restore all registers
-	PUSH dword [retBuf]	    ; Restore return address
+	PUSH dword [retBuf]     ; Restore return address
 	RET                     ; Return
