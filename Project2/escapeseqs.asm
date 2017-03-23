@@ -27,7 +27,7 @@ SECTION .data
     promptMsg:      db "Enter String: "
     promptMsgLen:   equ $-promptMsg
 
-    verifyMsg:      db "Original: "
+    verifyMsg:      db 10, 10, "Original: "
     verifyMsgLen:   equ $-verifyMsg
 
     convertMsg:     db 10, "Convert: "
@@ -78,20 +78,9 @@ _start:
     MOV ecx, inputBuffer    ; Buffer to hold the string
     MOV edx, BUFFER_SIZE    ; Size of the buffer
     INT 80H                 ; Interrupt service vector call
+
+    MOV [ecx + eax - 1], byte NULL   ; Null terminates the string
     MOV [inputLen], eax     ; Save the size of the input
-
-    ;;; Verifies what the player typed
-    MOV eax, SYSCALL_WRITE
-    MOV ebx, STDOUT
-    MOV ecx, verifyMsg      ; The message 'Original: '
-    MOV edx, verifyMsgLen
-    INT 80H
-
-    MOV eax, SYSCALL_WRITE
-    MOV ecx, inputBuffer    ; The input message
-    MOV edx, [inputLen]
-    MOV [ecx + edx - 1], byte NULL   ; Null terminates the string
-    INT 80H
 
     ;;; Prepares for main loop
     MOV esi, inputBuffer    ; Move the input string address into esi
@@ -101,13 +90,13 @@ _start:
 ;;; Iterates through the string, parsing escapes when encountered
 ;;; --------------------------------------------------------------
 .mainloop:
-    MOV ah, [esi]          ; move the byte ESI points to into AH
-    CMP ah, NULL           ; Compare the character in AH to null 
-    JE .end                ; Jump to the end if it's null
-    INC esi                ; Have ESI point to the next character
-    CMP ah, '\'            ; Check if it's a backslash
-    JNE .writechar         ; Write the character if it isn't
-    CALL .handle_ESC       ; Figure out what the escape character is
+    MOV  ah, [esi]      ; move the byte ESI points to into AH
+    CMP  ah, NULL       ; Compare the character in AH to null 
+    JE   .end           ; Jump to the end if it's null
+    INC  esi            ; Have ESI point to the next character
+    CMP  ah, '\'        ; Check if it's a backslash
+    JNE  .writechar     ; Write the character if it isn't
+    CALL .handle_ESC    ; Figure out what the escape character is
 
 ;;; --------------------------------------------------------------    
 ;;; Writes a character into the output buffer, increments index
@@ -131,15 +120,15 @@ _start:
     ;;; A '\' is in AH right now. We'll leave it there assuming an
     ;;; error will occur and change it if necessary.
 
-    MOV dl, [esi]       ; Move the character into dl        
+    MOV dl, [esi]       ; Move the character into DL      
 
     CMP dl, NULL        ; Test if it's null
-    JE .escapeAtEndErr  ; Print error and end
+    JE .escapeAtEndErr  ; Print error and end the program
 
     INC esi             ; Move up one from the character analyzed
 
     CMP dl, 48          ; Anything below 48 isn't legal
-    JL  .unknownEscErr  ; End
+    JL  .unknownEscErr  ; Print out an error
 
     CMP dl, 56          ; Check if it's '0'-'7'
     JL  .isOctal        ; Parse the octal value
@@ -198,9 +187,8 @@ _start:
         INT 80H   
 
         MOV eax, SYSCALL_WRITE
-        MOV ebx, STDOUT  
-        MOV ecx, overflowCopy  ; The incorrect octal value
-        MOV edx, 4             ; Length of the copy buffer 
+        MOV ecx, overflowCopy   ; The incorrect octal value
+        MOV edx, 4              ; Length of the copy buffer 
         INT 80H  
 
         POPAD                   ; Restore all the registers
@@ -214,19 +202,19 @@ _start:
     ;;; ----------------------------------------------------------
     .isLowerCase:
         AND edx, 0FFh       ; Clear all but lower-order 8-bits of edx
-        MOV dh, LOOKUP      ; Get escape character value from the table
+        MOV dh, LOOKUP      ; Get escape character value from table
         CMP dh, -1          ; Check if the entry equals -1
-        JE .unknownEscErr   ; If it does, print error message                                  
+        JE  .unknownEscErr  ; If it does, print error message                                  
         MOV ah, dh          ; Otherwise it's a legal escape value
         JMP .end_esc
 
     .isOctal:
         PUSH ebx        ; Save whatever is in ebx. Need it for val
-        XOR bx, bx      ; Clear BX to hold running total (val = 0)
-        XOR ecx, ecx    ; Clear ECX for loop count
-        MOV ecx, 3      ; Start count (octal is max three digits)
-        MOV ebp, overflowCopy   ; Address to copy octal characters
-        MOV [ebp], dword 0      ; clear the copy space
+        XOR  bx, bx     ; Clear BX to hold running total (val = 0)
+        XOR  ecx, ecx   ; Clear ECX for loop count
+        MOV  ecx, 3     ; Start count (octal is max three digits)
+        MOV  ebp, overflowCopy   ; Address to copy octal characters
+        MOV  [ebp], dword 0      ; clear the copy space
 
         ;;; ------------------------------------------------------
         ;;; The next three subroutines are only used by .isOctal 
@@ -255,7 +243,7 @@ _start:
             DEC esi         ; Step back esi (avoids reading too far)
             CMP bx, 255     ; Check if the octal value is too high
             JA .overflowErr ; Value is too high. Print error and return
-            MOV ah, bl      ; bl is where our octal value is
+            MOV ah, bl      ; BL is where our octal value is
 
         .pop_return:
             POP ebx         ; Put ebx value we saved back into ebx
@@ -268,14 +256,24 @@ _start:
     MOV [ebx], byte 10      ; Terminate the new string with a newline
                             ; Makes output look a bit nicer
 
+    ;;; Verifies what the player typed
+    MOV eax, SYSCALL_WRITE
+    MOV ebx, STDOUT
+    MOV ecx, verifyMsg      ; The message 'Original: '
+    MOV edx, verifyMsgLen
+    INT 80H
+
+    MOV eax, SYSCALL_WRITE
+    MOV ecx, inputBuffer    ; The input message
+    MOV edx, [inputLen]
+    INT 80H
+
     MOV eax, SYSCALL_WRITE  ; Write the new message
-    MOV ebx, STDOUT 
     MOV ecx, convertMsg
     MOV edx, convertMsgLen
     INT 80H
 
     MOV eax, SYSCALL_WRITE
-    MOV ebx, STDOUT
     MOV ecx, outputBuffer
     MOV edx, [inputLen]
     INT 80H
